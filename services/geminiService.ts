@@ -1,17 +1,9 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from "../types";
-import { cleanBase64 } from "../utils/imageUtils";
 
 export const analyzeDesignDiscrepancies = async (
   designImageBase64: string,
   devImageBase64: string
 ): Promise<AnalysisResult> => {
-  
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is missing.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemInstruction = `
     You are an expert Frontend QA Engineer and UI/UX Designer with pixel-perfect vision.
@@ -52,72 +44,19 @@ export const analyzeDesignDiscrepancies = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        role: "user",
-        parts: [
-          { text: "Design Mockup (Target):" },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64(designImageBase64),
-            },
-          },
-          { text: "Development Screenshot (Implementation):" },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64(devImageBase64),
-            },
-          },
-          { text: "Compare and find visual discrepancies. Return result in Chinese." },
-        ],
-      },
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: {
-              type: Type.STRING,
-              description: "A brief summary of the overall fidelity in Chinese.",
-            },
-            issues: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING, description: "Short title in Chinese" },
-                  description: { type: Type.STRING, description: "Detailed description in Chinese" },
-                  location: { type: Type.STRING, description: "Location description in Chinese" },
-                  severity: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-                  category: { type: Type.STRING, enum: ["Layout", "Style", "Content"] },
-                  box_2d: {
-                    type: Type.ARRAY,
-                    description: "Bounding box [ymin, xmin, ymax, xmax] on the Dev Screenshot normalized to 1000",
-                    items: { type: Type.NUMBER }
-                  }
-                },
-                required: ["title", "description", "severity", "category", "location", "box_2d"],
-              },
-            },
-          },
-          required: ["summary", "issues"],
-        },
-      },
+    const res = await fetch("/.netlify/functions/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ designImageBase64, devImageBase64, systemInstruction })
     });
-
-    if (!response.text) {
-        throw new Error("No response text from Gemini");
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || "Analyze function request failed");
     }
-
-    const result = JSON.parse(response.text) as AnalysisResult;
+    const result = (await res.json()) as AnalysisResult;
     return result;
-
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
-    throw error;
+    console.error("Analyze Function Error:", error);
+    throw error as any;
   }
 };
