@@ -29,12 +29,16 @@ export const handler: Handler = async (event) => {
       base1 + "/compatible-mode/v1/chat/completions",
       "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
     ];
+    const endpointsRest = [
+      base1 + "/api/v1/services/aigc/multimodal-generation/generate",
+      "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generate"
+    ];
 
     for (const endpoint of endpoints) {
       for (const model of candidates) {
         const payload = {
-        model,
-        messages: [
+          model,
+          messages: [
           {
             role: "system",
             content: [{ type: "text", text: String(systemInstruction || "") }]
@@ -122,6 +126,65 @@ export const handler: Handler = async (event) => {
         } catch (err: any) {
           clearTimeout(timer);
           // Abort (timeout) or network error: try next endpoint/model
+          continue;
+        }
+      }
+    }
+
+    for (const endpoint of endpointsRest) {
+      for (const model of candidates) {
+        const payload = {
+          model,
+          input: {
+            messages: [
+              { role: "system", content: [{ type: "text", text: String(systemInstruction || "") }] },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Design Mockup (Target):" },
+                  { type: "image", image: `data:image/jpeg;base64,${cleanBase64(designImageBase64)}` },
+                  { type: "text", text: "Development Screenshot (Implementation):" },
+                  { type: "image", image: `data:image/jpeg;base64,${cleanBase64(devImageBase64)}` },
+                  { type: "text", text: "Compare and find visual discrepancies. Return result in Chinese and only JSON." }
+                ]
+              }
+            ]
+          },
+          parameters: { result_format: "message" }
+        };
+
+        const controller = new AbortController();
+        const timeoutMs = Number(process.env.DASHSCOPE_TIMEOUT_MS || 20000);
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let text = "";
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          text = await res.text();
+          clearTimeout(timer);
+
+          if (!res.ok) {
+            if (/^\s*<html/i.test(text)) {
+              continue;
+            }
+            return { statusCode: res.status, body: text || "DashScope request failed" };
+          }
+
+          const data = JSON.parse(text);
+          const outputText = data?.output_text || (data?.output?.choices?.[0]?.message?.content?.find((p: any) => p?.text)?.text);
+          if (!outputText || typeof outputText !== "string") {
+            continue;
+          }
+          return { statusCode: 200, body: outputText };
+        } catch (err: any) {
+          clearTimeout(timer);
           continue;
         }
       }
