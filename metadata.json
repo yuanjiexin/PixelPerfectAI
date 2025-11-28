@@ -1,0 +1,5 @@
+{
+  "name": "研发自查工具",
+  "description": "A frontend design reduction tool. Upload design and dev screenshots to visualize differences and get an AI-generated discrepancy report.",
+  "requestFramePermissions": []
+}
