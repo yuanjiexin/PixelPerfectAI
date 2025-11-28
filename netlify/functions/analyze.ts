@@ -23,9 +23,15 @@ export const handler: Handler = async (event) => {
 
     const preferred = (process.env.DASHSCOPE_MODEL || process.env.VITE_DASHSCOPE_MODEL || "qwen2.5-vl") as string;
     const candidates = Array.from(new Set([preferred, "qwen-vl-plus", "qwen2.5-vl-plus", "qwen-vl-max", "qwen2.5-vl"]));
+    const endpoints = [
+      (process.env.DASHSCOPE_ENDPOINT || process.env.VITE_DASHSCOPE_ENDPOINT || "https://dashscope.aliyuncs.com") + 
+        "/compatible-mode/v1/chat/completions",
+      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+    ];
 
-    for (const model of candidates) {
-      const payload = {
+    for (const endpoint of endpoints) {
+      for (const model of candidates) {
+        const payload = {
         model,
         messages: [
           {
@@ -71,38 +77,56 @@ export const handler: Handler = async (event) => {
             }
           }
         }
-      };
+        };
 
-      const res = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const text = await res.text();
-      if (!res.ok) {
-        let code = "";
+        const controller = new AbortController();
+        const timeoutMs = Number(process.env.DASHSCOPE_TIMEOUT_MS || 20000);
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let text = "";
         try {
-          const j = JSON.parse(text);
-          code = j?.error?.code || j?.error?.type || "";
-        } catch {}
-        if (code === "model_not_found") {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          text = await res.text();
+          clearTimeout(timer);
+
+          if (!res.ok) {
+            let code = "";
+            try {
+              const j = JSON.parse(text);
+              code = j?.error?.code || j?.error?.type || "";
+            } catch {}
+            if (code === "model_not_found") {
+              continue;
+            }
+            // If HTML timeout page returned by upstream, try next endpoint/model
+            if (/^\s*<html/i.test(text)) {
+              continue;
+            }
+            return { statusCode: res.status, body: text || "DashScope request failed" };
+          }
+
+          const data = JSON.parse(text);
+          const content = data?.choices?.[0]?.message?.content;
+          if (!content || typeof content !== "string") {
+            continue;
+          }
+          return { statusCode: 200, body: content };
+        } catch (err: any) {
+          clearTimeout(timer);
+          // Abort (timeout) or network error: try next endpoint/model
           continue;
         }
-        return { statusCode: res.status, body: text || "DashScope request failed" };
       }
-      const data = JSON.parse(text);
-      const content = data?.choices?.[0]?.message?.content;
-      if (!content || typeof content !== "string") {
-        continue;
-      }
-      return { statusCode: 200, body: content };
     }
 
-    return { statusCode: 502, body: "All candidate models failed. Please set DASHSCOPE_MODEL to a valid model." };
+    return { statusCode: 502, body: "All candidate models/endpoints failed. Please set DASHSCOPE_MODEL to a valid visual model or configure DASHSCOPE_ENDPOINT." };
   } catch (e: any) {
     return { statusCode: 500, body: String(e?.message || e) };
   }
