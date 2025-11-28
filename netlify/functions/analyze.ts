@@ -125,7 +125,14 @@ export const handler: Handler = async (event) => {
           if (!content || typeof content !== "string") {
             continue;
           }
-          return { statusCode: 200, body: content };
+          let result: any;
+          try {
+            result = JSON.parse(content);
+          } catch {
+            // If model didn't honor JSON, wrap as error for clarity
+            return { statusCode: 502, body: JSON.stringify({ error: { message: "Model returned non-JSON content", content } }) };
+          }
+          return { statusCode: 200, body: JSON.stringify(result) };
         } catch (err: any) {
           clearTimeout(timer);
           // Abort (timeout) or network error: try next endpoint/model
@@ -186,7 +193,13 @@ export const handler: Handler = async (event) => {
           if (!outputText || typeof outputText !== "string") {
             continue;
           }
-          return { statusCode: 200, body: outputText };
+          let result: any;
+          try {
+            result = JSON.parse(outputText);
+          } catch {
+            return { statusCode: 502, body: JSON.stringify({ error: { message: "Model returned non-JSON output_text", outputText } }) };
+          }
+          return { statusCode: 200, body: JSON.stringify(result) };
         } catch (err: any) {
           clearTimeout(timer);
           continue;
