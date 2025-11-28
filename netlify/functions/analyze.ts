@@ -31,8 +31,6 @@ export const handler: Handler = async (event) => {
     const base1 = sanitize(process.env.DASHSCOPE_ENDPOINT || process.env.VITE_DASHSCOPE_ENDPOINT) || "https://dashscope.aliyuncs.com";
     const workspace = sanitize(process.env.DASHSCOPE_WORKSPACE || process.env.VITE_DASHSCOPE_WORKSPACE);
     const endpoints = [
-      base1 + "/v1/chat/completions",
-      "https://dashscope-intl.aliyuncs.com/v1/chat/completions",
       base1 + "/compatible-mode/v1/chat/completions",
       "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
     ];
@@ -101,8 +99,7 @@ export const handler: Handler = async (event) => {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              "X-DashScope-API-Key": apiKey
-              , ...(workspace ? { "X-DashScope-Workspace": workspace } : {})
+              ...(workspace ? { "X-DashScope-Workspace": workspace } : {})
             },
             body: JSON.stringify(payload),
             signal: controller.signal
@@ -189,8 +186,7 @@ export const handler: Handler = async (event) => {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              "X-DashScope-API-Key": apiKey
-              , ...(workspace ? { "X-DashScope-Workspace": workspace } : {})
+              ...(workspace ? { "X-DashScope-Workspace": workspace } : {})
             },
             body: JSON.stringify(payload),
             signal: controller.signal
