@@ -26,6 +26,8 @@ export const handler: Handler = async (event) => {
     const candidates = Array.from(new Set([preferred, "qwen-vl-plus", "qwen2.5-vl-plus", "qwen-vl-max", "qwen2.5-vl"]));
     const base1 = sanitize(process.env.DASHSCOPE_ENDPOINT || process.env.VITE_DASHSCOPE_ENDPOINT) || "https://dashscope.aliyuncs.com";
     const endpoints = [
+      base1 + "/v1/chat/completions",
+      "https://dashscope-intl.aliyuncs.com/v1/chat/completions",
       base1 + "/compatible-mode/v1/chat/completions",
       "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
     ];
@@ -93,7 +95,8 @@ export const handler: Handler = async (event) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`
+              Authorization: `Bearer ${apiKey}`,
+              "X-DashScope-API-Key": apiKey
             },
             body: JSON.stringify(payload),
             signal: controller.signal
@@ -162,7 +165,8 @@ export const handler: Handler = async (event) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`
+              Authorization: `Bearer ${apiKey}`,
+              "X-DashScope-API-Key": apiKey
             },
             body: JSON.stringify(payload),
             signal: controller.signal
