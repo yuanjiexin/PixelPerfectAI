@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 dotenv.config({ path: '.env.local' })
 
@@ -152,7 +154,15 @@ const analyzeHandler = async (req, res) => {
 app.post('/analyze', analyzeHandler)
 app.post('/api/analyze', analyzeHandler)
 
-const port = 8787
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const distPath = path.resolve(__dirname, '..', 'dist')
+
+app.use(express.static(distPath))
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'))
+})
+
+const port = Number(process.env.PORT || 3000)
 app.listen(port, () => {
-  console.log(`Local API server listening on http://localhost:${port}`)
+  console.log(`Server listening on http://0.0.0.0:${port}`)
 })

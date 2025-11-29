@@ -44,7 +44,7 @@ export const analyzeDesignDiscrepancies = async (
   `;
 
   try {
-    const url = import.meta.env.DEV ? "/api/analyze" : "/.netlify/functions/analyze";
+    const url = "/api/analyze";
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
